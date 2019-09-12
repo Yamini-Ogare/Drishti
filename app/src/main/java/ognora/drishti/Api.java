@@ -24,7 +24,7 @@ public interface Api {
 
     @POST("/predict")
     Call<JsonObject> predict(
-            @Body HashMap map
+            @Body File image
     );
 
 

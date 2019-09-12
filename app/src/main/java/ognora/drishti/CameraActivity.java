@@ -18,6 +18,9 @@ import android.widget.Toast;
 
 import com.google.gson.JsonObject;
 
+import net.gotev.speech.Logger;
+import net.gotev.speech.Speech;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -40,7 +43,7 @@ public class CameraActivity extends AppCompatActivity {
     Camera camera;
     FrameLayout cameraPreview;
     ImageView flash, click, flip;
-    int CAMERA_PERMISSION = 1;
+    int PERMISSION = 101;
 
     ShowCamera showCamera ;
 
@@ -54,6 +57,9 @@ public class CameraActivity extends AppCompatActivity {
         click = findViewById(R.id.click);
         flip = findViewById(R.id.flip);
 
+        Speech.init(this, getPackageName());
+        Logger.setLogLevel(Logger.LogLevel.DEBUG);
+
         checkPermission();
 
     }
@@ -64,6 +70,9 @@ public class CameraActivity extends AppCompatActivity {
         super.onResume();
         openCamera();
 
+
+
+
     }
 
     @Override
@@ -72,13 +81,20 @@ public class CameraActivity extends AppCompatActivity {
         camera.release();
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        Speech.getInstance().shutdown();
+    }
+
     private void checkPermission() {
 
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-                != PackageManager.PERMISSION_GRANTED) {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA )
+                != PackageManager.PERMISSION_GRANTED  && (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED )) {
 
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.CAMERA}, CAMERA_PERMISSION);
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                    Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO}, PERMISSION);
 
         }
     }
@@ -87,9 +103,10 @@ public class CameraActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if(requestCode== CAMERA_PERMISSION && grantResults.length>0 ) {
+        if(requestCode== PERMISSION && grantResults.length>0 ) {
 
-            if(grantResults[0] == PackageManager.PERMISSION_GRANTED && grantResults[1] == PackageManager.PERMISSION_GRANTED){
+            if(grantResults[0] == PackageManager.PERMISSION_GRANTED && grantResults[1] == PackageManager.PERMISSION_GRANTED
+            && grantResults[2]==PackageManager.PERMISSION_GRANTED){
                return;
             }
             else
@@ -127,23 +144,26 @@ public class CameraActivity extends AppCompatActivity {
                 return;
             else
             {
-                 /*   //send to ml using retrofit
-                HashMap<String ,Object> map = new HashMap<>();
-                map.put("image",getFileFromBytes(bytes) );
+                    //send to ml using retrofit
+               /* HashMap<String ,Object> map = new HashMap<>();
+                map.put("image",pictureFile );*/
 
                     Api api = ApiClient.getClient().create(Api.class);
-                    Call<JsonObject> call = api.predict(map);
+                    Call<JsonObject> call = api.predict(pictureFile);
 
                     call.enqueue(new Callback<JsonObject>() {
                         @Override
                         public void onResponse(Call<JsonObject> call, Response<JsonObject> response) {
 
                             if (response.isSuccessful()) {
-                                String prediction = " ";
-                                    prediction = response.body().get("predictions").toString();
+                                String prediction ="";
+                                if(response.body().get("success").getAsBoolean()) {
+                                   JsonObject obj = response.body().get("predictions").getAsJsonObject();
 
+                                   prediction = obj.get("label").getAsString();
+                                    Toast.makeText(CameraActivity.this, prediction + "note", Toast.LENGTH_LONG).show();
 
-                                Toast.makeText(CameraActivity.this, prediction, Toast.LENGTH_LONG).show();
+                                }
 
                             }
 
@@ -154,7 +174,6 @@ public class CameraActivity extends AppCompatActivity {
                             t.printStackTrace();
                         }
                     });
-*/
 
                     camera.startPreview();
 

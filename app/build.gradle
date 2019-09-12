@@ -30,6 +30,9 @@ dependencies {
     implementation 'com.squareup.retrofit2:retrofit:2.4.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.4.0'
 
+    // voice dependencies
+    implementation 'net.gotev:speech:1.4.0'
+
 
 
 }
