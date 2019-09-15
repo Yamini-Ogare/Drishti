@@ -1,13 +1,22 @@
 package ognora.drishti;
 
 import android.Manifest;
+import android.annotation.TargetApi;
+import android.app.AlertDialog;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.hardware.Camera;
+import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraManager;
 import android.media.MediaPlayer;
+import android.os.Build;
 import android.os.Environment;
 import android.support.annotation.NonNull;
+import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -35,6 +44,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.security.Policy;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -48,7 +58,7 @@ import retrofit2.Response;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
-public class CameraActivity extends AppCompatActivity {
+public class CameraActivity extends AppCompatActivity{
 
     Camera camera;
     FrameLayout cameraPreview;
@@ -57,6 +67,11 @@ public class CameraActivity extends AppCompatActivity {
     net.gotev.speech.ui.SpeechProgressView speechview ;
 
     ShowCamera showCamera ;
+
+    private boolean isFlashOn = false;
+    boolean hasCameraFlash;
+    Camera.Parameters params ;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,7 +86,9 @@ public class CameraActivity extends AppCompatActivity {
 
      //    final MediaPlayer mp = MediaPlayer.create(this, R.raw.soho);
 
-        Speech.init(this, getPackageName());
+         hasCameraFlash = getPackageManager().
+                hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH);
+
         Logger.setLogLevel(Logger.LogLevel.DEBUG);
 
         checkPermission();
@@ -83,12 +100,13 @@ public class CameraActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         openCamera();
+        params = camera.getParameters();
 
-        voiceRecognition();
+        startService(new Intent(this, Myservice.class));
+
+      //  voiceRecognition();
 
     }
-
-
 
     @Override
     protected void onPause() {
@@ -99,7 +117,7 @@ public class CameraActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        Speech.getInstance().shutdown();
+
     }
 
     private void checkPermission() {
@@ -146,11 +164,17 @@ public class CameraActivity extends AppCompatActivity {
 
     }
 
-    // when capture button is clicked
+    // when capture button is clicked click Listener
     public void captureImage(View V)
-    { clickPicture();
-
+    {
+        clickPicture();
     }
+
+    // when flash icon is clicked
+    public void flashButton(View view) {
+        flashtoggle();
+    }
+
 
 
     Camera.PictureCallback pictureCallback = new Camera.PictureCallback() {
@@ -250,78 +274,94 @@ public class CameraActivity extends AppCompatActivity {
         return imageFile;
     }
 
-    private void voiceRecognition() {
-
-        try {
-            Speech.getInstance().startListening(speechview , new SpeechDelegate() {
-                @Override
-                public void onStartOfSpeech() {
-                    Log.i("speech", "speech recognition is now active");
-                }
-
-                @Override
-                public void onSpeechRmsChanged(float value) {
-                    Log.d("speech", "rms is now: " + value);
-                }
-
-                @Override
-                public void onSpeechPartialResults(List<String> results) {
-                    StringBuilder str = new StringBuilder();
-                    for (String res : results) {
-                        str.append(res).append(" ");
-                    }
-
-                    Log.i("speech", "partial result: " + str.toString().trim());
-                }
-
-                @Override
-                public void onSpeechResult(String result) {
-                    if(result==null)
-                        tryagain();
-                    Log.i("speech", "result: " + result);
-
-                    if(result.equalsIgnoreCase("click"))
-                        clickPicture();
-
-                }
-
-
-
-            });
-
-
-        } catch (SpeechRecognitionNotAvailable exc) {
-            Log.e("speech", "Speech recognition is not available on this device!");
-            // You can prompt the user if he wants to install Google App to have
-            // speech recognition, and then you can simply call:
-            //
-            // SpeechUtil.redirectUserToGoogleAppOnPlayStore(this);
-            //
-            // to redirect the user to the Google App page on Play Store
-        } catch (GoogleVoiceTypingDisabledException exc) {
-            Log.e("speech", "Google voice typing must be enabled!");
-        }
-    }
 
     // camera feature functions
- // click image
-    private void clickPicture() {
+
+    // click image
+    public void clickPicture() {
         if(camera!=null)
         {
             camera.takePicture(null, null, pictureCallback);
         }
-
-        voiceRecognition();
+        startService(new Intent(this, Myservice.class));
     }
 
     // try again
-    private void tryagain()
+    public void tryagain()
     {  Log.i("speech", "try again");
-        voiceRecognition();
+      //  voiceRecognition();
+        startService(new Intent(this, Myservice.class));
 
     }
+
     // flash
-    //camera switch
+    public void flashtoggle() {
+        if (!hasCameraFlash) {
+            // device doesn't support flash
+            // Show alert message and close the application
+            AlertDialog alert = new AlertDialog.Builder(this)
+                    .create();
+            alert.setTitle("Error");
+            alert.setMessage("Sorry, your device doesn't support flash light!");
+            alert.setButton("OK", new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog, int which) {
+                    // closing the application
+                    finish();
+                }
+            });
+            alert.show();
+        }
+        else
+        if (isFlashOn) {
+            // turn off flash
+            turnOffFlash();
+        } else {
+            // turn on flash
+            turnOnFlash();
+        }
+
+    }
+
+    private void turnOffFlash() {
+
+        if (isFlashOn) {
+            if (camera == null || params == null) {
+                return;
+            }
+
+            params = camera.getParameters();
+            params.setFlashMode(Camera.Parameters.FLASH_MODE_OFF);
+            camera.setParameters(params);
+            camera.stopPreview();
+            isFlashOn = false;
+
+            // changing button/switch image
+            flash.setImageResource(R.drawable.flashoff);
+        }
+
+
+    }
+
+    private  void turnOnFlash(){
+        if (!isFlashOn) {
+            if (camera == null || params == null) {
+                return;
+            }
+
+            params = camera.getParameters();
+            params.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
+            camera.setParameters(params);
+            camera.startPreview();
+            isFlashOn = true;
+
+            // changing button/switch image
+            flash.setImageResource(R.drawable.flashon);
+        }
+
+
+    }
+
+    //Voice mute
 
 
 
