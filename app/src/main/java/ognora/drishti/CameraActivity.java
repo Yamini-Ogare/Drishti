@@ -5,6 +5,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.hardware.Camera;
+import android.media.MediaPlayer;
 import android.os.Environment;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
@@ -16,10 +17,15 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
+import net.gotev.speech.GoogleVoiceTypingDisabledException;
 import net.gotev.speech.Logger;
 import net.gotev.speech.Speech;
+import net.gotev.speech.SpeechDelegate;
+import net.gotev.speech.SpeechRecognitionNotAvailable;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -31,7 +37,11 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.RequestBody;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -44,6 +54,7 @@ public class CameraActivity extends AppCompatActivity {
     FrameLayout cameraPreview;
     ImageView flash, click, flip;
     int PERMISSION = 101;
+    net.gotev.speech.ui.SpeechProgressView speechview ;
 
     ShowCamera showCamera ;
 
@@ -56,6 +67,9 @@ public class CameraActivity extends AppCompatActivity {
         flash = findViewById(R.id.flash);
         click = findViewById(R.id.click);
         flip = findViewById(R.id.flip);
+        speechview = findViewById(R.id.progress) ;
+
+     //    final MediaPlayer mp = MediaPlayer.create(this, R.raw.soho);
 
         Speech.init(this, getPackageName());
         Logger.setLogLevel(Logger.LogLevel.DEBUG);
@@ -70,10 +84,11 @@ public class CameraActivity extends AppCompatActivity {
         super.onResume();
         openCamera();
 
-
-
+        voiceRecognition();
 
     }
+
+
 
     @Override
     protected void onPause() {
@@ -122,7 +137,6 @@ public class CameraActivity extends AppCompatActivity {
             camera = Camera.open(); // attempt to get a Camera instance
             showCamera = new ShowCamera(this, camera);
             cameraPreview.addView(showCamera);
-
         }
         catch (Exception e){
             // Camera is not available (in use or does not exist)
@@ -131,6 +145,13 @@ public class CameraActivity extends AppCompatActivity {
 
 
     }
+
+    // when capture button is clicked
+    public void captureImage(View V)
+    { clickPicture();
+
+    }
+
 
     Camera.PictureCallback pictureCallback = new Camera.PictureCallback() {
         @Override
@@ -144,24 +165,36 @@ public class CameraActivity extends AppCompatActivity {
                 return;
             else
             {
-                    //send to ml using retrofit
-               /* HashMap<String ,Object> map = new HashMap<>();
-                map.put("image",pictureFile );*/
+             /*       //send to ml using retrofit
 
                     Api api = ApiClient.getClient().create(Api.class);
-                    Call<JsonObject> call = api.predict(pictureFile);
 
-                    call.enqueue(new Callback<JsonObject>() {
+
+                // Create a request body with file and image media type
+                RequestBody fileReqBody = RequestBody.create(MediaType.parse("image/*"), pictureFile);
+                // Create MultipartBody.Part using file request-body,file name and part name
+                MultipartBody.Part part = MultipartBody.Part.createFormData("image", pictureFile.getName(), fileReqBody);
+
+                Call call = api.predict(part);
+
+
+                call.enqueue(new Callback<JsonObject>() {
                         @Override
                         public void onResponse(Call<JsonObject> call, Response<JsonObject> response) {
 
                             if (response.isSuccessful()) {
                                 String prediction ="";
                                 if(response.body().get("success").getAsBoolean()) {
-                                   JsonObject obj = response.body().get("predictions").getAsJsonObject();
 
-                                   prediction = obj.get("label").getAsString();
-                                    Toast.makeText(CameraActivity.this, prediction + "note", Toast.LENGTH_LONG).show();
+                                      JsonArray jarray = response.body().get("predictions").getAsJsonArray();
+
+                                        JsonObject obj = jarray.get(0).getAsJsonObject();
+                                        prediction = obj.get("label").getAsString();
+
+                                  if(prediction.equalsIgnoreCase("0"))
+                                      Toast.makeText(CameraActivity.this, "Try again", Toast.LENGTH_LONG).show();
+                                  else
+                                    Toast.makeText(CameraActivity.this, prediction + " note", Toast.LENGTH_LONG).show();
 
                                 }
 
@@ -173,7 +206,7 @@ public class CameraActivity extends AppCompatActivity {
                         public void onFailure(Call<JsonObject> call, Throwable t) {
                             t.printStackTrace();
                         }
-                    });
+                    });*/
 
                     camera.startPreview();
 
@@ -197,15 +230,6 @@ public class CameraActivity extends AppCompatActivity {
 
     }
 
-    // when capture button is clicked
-    public void captureImage(View V)
-    {
-        if(camera!=null)
-        {
-            camera.takePicture(null, null, pictureCallback);
-        }
-    }
-
     public File getFileFromBytes(byte[] imageBytes){
         Bitmap bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
 
@@ -226,7 +250,76 @@ public class CameraActivity extends AppCompatActivity {
         return imageFile;
     }
 
+    private void voiceRecognition() {
+
+        try {
+            Speech.getInstance().startListening(speechview , new SpeechDelegate() {
+                @Override
+                public void onStartOfSpeech() {
+                    Log.i("speech", "speech recognition is now active");
+                }
+
+                @Override
+                public void onSpeechRmsChanged(float value) {
+                    Log.d("speech", "rms is now: " + value);
+                }
+
+                @Override
+                public void onSpeechPartialResults(List<String> results) {
+                    StringBuilder str = new StringBuilder();
+                    for (String res : results) {
+                        str.append(res).append(" ");
+                    }
+
+                    Log.i("speech", "partial result: " + str.toString().trim());
+                }
+
+                @Override
+                public void onSpeechResult(String result) {
+                    if(result==null)
+                        tryagain();
+                    Log.i("speech", "result: " + result);
+
+                    if(result.equalsIgnoreCase("click"))
+                        clickPicture();
+
+                }
+
+
+
+            });
+
+
+        } catch (SpeechRecognitionNotAvailable exc) {
+            Log.e("speech", "Speech recognition is not available on this device!");
+            // You can prompt the user if he wants to install Google App to have
+            // speech recognition, and then you can simply call:
+            //
+            // SpeechUtil.redirectUserToGoogleAppOnPlayStore(this);
+            //
+            // to redirect the user to the Google App page on Play Store
+        } catch (GoogleVoiceTypingDisabledException exc) {
+            Log.e("speech", "Google voice typing must be enabled!");
+        }
+    }
+
     // camera feature functions
+ // click image
+    private void clickPicture() {
+        if(camera!=null)
+        {
+            camera.takePicture(null, null, pictureCallback);
+        }
+
+        voiceRecognition();
+    }
+
+    // try again
+    private void tryagain()
+    {  Log.i("speech", "try again");
+        voiceRecognition();
+
+    }
     // flash
     //camera switch
 
