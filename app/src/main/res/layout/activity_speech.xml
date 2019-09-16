@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+    <LinearLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        android:orientation="vertical"
+        android:layout_width="120dp"
+        android:layout_height="150dp"
+        android:id="@+id/linearLayout"
+        android:layout_centerHorizontal="true"
+        android:layout_gravity="center"
+        >
+
+        <net.gotev.speech.ui.SpeechProgressView
+            android:id="@+id/progress"
+            android:layout_width="120dp"
+            android:layout_height="150dp"
+            android:background="@android:color/transparent"
+            android:elevation="13dp"/>
+
+    </LinearLayout>
