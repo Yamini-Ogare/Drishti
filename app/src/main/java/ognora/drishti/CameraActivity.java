@@ -16,11 +16,13 @@ import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.Environment;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -35,6 +37,7 @@ import net.gotev.speech.Logger;
 import net.gotev.speech.Speech;
 import net.gotev.speech.SpeechDelegate;
 import net.gotev.speech.SpeechRecognitionNotAvailable;
+import net.gotev.speech.TextToSpeechCallback;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -60,17 +63,18 @@ import retrofit2.converter.gson.GsonConverterFactory;
 
 public class CameraActivity extends AppCompatActivity{
 
-    Camera camera;
+    private static final int START_SPEECH = 1000;
+     Camera camera;
     FrameLayout cameraPreview;
     ImageView flash, click, flip;
     int PERMISSION = 101;
-    net.gotev.speech.ui.SpeechProgressView speechview ;
+     String TAG = "Error";
+
 
     ShowCamera showCamera ;
 
-    private boolean isFlashOn = false;
-    boolean hasCameraFlash;
-    Camera.Parameters params ;
+     private boolean isFlashOn = false;boolean hasCameraFlash;
+     Camera.Parameters params ;
 
 
     @Override
@@ -82,7 +86,7 @@ public class CameraActivity extends AppCompatActivity{
         flash = findViewById(R.id.flash);
         click = findViewById(R.id.click);
         flip = findViewById(R.id.flip);
-        speechview = findViewById(R.id.progress) ;
+
 
      //    final MediaPlayer mp = MediaPlayer.create(this, R.raw.soho);
 
@@ -91,32 +95,61 @@ public class CameraActivity extends AppCompatActivity{
 
         Logger.setLogLevel(Logger.LogLevel.DEBUG);
 
+
         checkPermission();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        openCamera();
+    }
+
+    @Override
+    protected void onPostResume() {
+        super.onPostResume();
+        if(SpeechDataHolder.hasData())
+        {
+            compare(SpeechDataHolder.getData());        }
 
     }
 
-
     @Override
-    protected void onResume() {
-        super.onResume();
-        openCamera();
-        params = camera.getParameters();
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if(requestCode==START_SPEECH && resultCode==RESULT_OK && data!= null){
+        //   compare(data.getExtras().getString("key"));
+        }
+    }
 
-        startService(new Intent(this, Myservice.class));
+    private void compare(String key ) {
+        if(key.toLowerCase().contains("click"))
+            clickPicture();
+        else if(key.toLowerCase().contains("flash"))
+            flashtoggle(this);
 
-      //  voiceRecognition();
 
+
+    }
+
+    private void openSpeech() {
+
+        Intent intent  = new Intent(this,SpeechActivity.class);
+        startActivityForResult(intent,START_SPEECH);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        camera.release();
+
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        Speech.getInstance().shutdown();
+        camera.release();
+
 
     }
 
@@ -155,6 +188,7 @@ public class CameraActivity extends AppCompatActivity{
             camera = Camera.open(); // attempt to get a Camera instance
             showCamera = new ShowCamera(this, camera);
             cameraPreview.addView(showCamera);
+            params = camera.getParameters();
         }
         catch (Exception e){
             // Camera is not available (in use or does not exist)
@@ -172,7 +206,7 @@ public class CameraActivity extends AppCompatActivity{
 
     // when flash icon is clicked
     public void flashButton(View view) {
-        flashtoggle();
+        flashtoggle(this);
     }
 
 
@@ -238,7 +272,7 @@ public class CameraActivity extends AppCompatActivity{
         }
     };
 
-    private File getOutputMediaFile() {
+    private static File getOutputMediaFile() {
 
         String state = Environment.getExternalStorageState();
         if(!state.equals(Environment.MEDIA_MOUNTED))
@@ -254,7 +288,7 @@ public class CameraActivity extends AppCompatActivity{
 
     }
 
-    public File getFileFromBytes(byte[] imageBytes){
+    public  File getFileFromBytes(byte[] imageBytes){
         Bitmap bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
 
         File imageFile = getOutputMediaFile();
@@ -269,44 +303,74 @@ public class CameraActivity extends AppCompatActivity{
             os.flush();
             os.close();
         } catch (Exception e) {
-            Log.e(getClass().getSimpleName(), "Error writing bitmap", e);
+            Log.e(TAG, "Error writing bitmap", e);
         }
         return imageFile;
     }
 
 
-    // camera feature functions
 
-    // click image
-    public void clickPicture() {
-        if(camera!=null)
-        {
-            camera.takePicture(null, null, pictureCallback);
-        }
-        startService(new Intent(this, Myservice.class));
-    }
+    // voice recognition
+
+
+
+
 
     // try again
     public void tryagain()
     {  Log.i("speech", "try again");
-      //  voiceRecognition();
-        startService(new Intent(this, Myservice.class));
+        //  voiceRecognition();
+        //  startService(new Intent(this, Myservice.class));
+
+    }
+
+    //Text to speech
+
+    public void say (String msg){
+        Speech.getInstance().say("say something", new TextToSpeechCallback() {
+            @Override
+            public void onStart() {
+                Log.i("speech", "speech started");
+            }
+
+            @Override
+            public void onCompleted() {
+                Log.i("speech", "speech completed");
+            }
+
+            @Override
+            public void onError() {
+                Log.i("speech", "speech error");
+            }
+        });
+
+    }
+
+    // camera feature functions
+    // click image
+    public  void clickPicture() {
+        if(camera!=null)
+        {
+            camera.takePicture(null, null, pictureCallback);
+        }
+       // startService(new Intent(this, Myservice.class));
+
 
     }
 
     // flash
-    public void flashtoggle() {
+    public  void flashtoggle(Context mcontext) {
         if (!hasCameraFlash) {
             // device doesn't support flash
             // Show alert message and close the application
-            AlertDialog alert = new AlertDialog.Builder(this)
+            AlertDialog alert = new AlertDialog.Builder(mcontext)
                     .create();
             alert.setTitle("Error");
             alert.setMessage("Sorry, your device doesn't support flash light!");
             alert.setButton("OK", new DialogInterface.OnClickListener() {
                 public void onClick(DialogInterface dialog, int which) {
                     // closing the application
-                    finish();
+                    flash.setVisibility(View.GONE);
                 }
             });
             alert.show();
@@ -322,7 +386,7 @@ public class CameraActivity extends AppCompatActivity{
 
     }
 
-    private void turnOffFlash() {
+    private  void turnOffFlash() {
 
         if (isFlashOn) {
             if (camera == null || params == null) {
@@ -339,10 +403,10 @@ public class CameraActivity extends AppCompatActivity{
             flash.setImageResource(R.drawable.flashoff);
         }
 
-
+        openCamera();
     }
 
-    private  void turnOnFlash(){
+    private void turnOnFlash(){
         if (!isFlashOn) {
             if (camera == null || params == null) {
                 return;
@@ -365,4 +429,29 @@ public class CameraActivity extends AppCompatActivity{
 
 
 
+    // Welcome
+
+    public void welcome()
+    {
+        String msg = "Welcome";
+
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+
+         if (event.getAction() == KeyEvent.ACTION_DOWN){
+
+             if(event.getKeyCode()==KeyEvent.KEYCODE_VOLUME_UP){
+                 openSpeech();
+               //  clickPicture();
+                 return true;
+             }
+
+         }
+
+        return super.dispatchKeyEvent(event);
+
+
+    }
 }

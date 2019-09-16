@@ -16,12 +16,6 @@ import java.util.List;
 
 public class Myservice extends Service {
 
-    Context mcontext;
-
-    public Myservice(Context mcontext) {
-        this.mcontext = mcontext;
-    }
-
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
@@ -30,14 +24,14 @@ public class Myservice extends Service {
 
     @Override
     public void onCreate() {
-        Speech.init(mcontext, getPackageName());
+        Speech.init(getApplicationContext(), getPackageName());
     }
 
     @Override
     public void onStart(Intent intent, int startId) {
 
-        try {
-            Speech.getInstance().startListening(((CameraActivity)mcontext).speechview , new SpeechDelegate() {
+     /*   try {
+            Speech.getInstance().startListening(mcontext.speechview , new SpeechDelegate() {
 
                 @Override
                 public void onStartOfSpeech() {
@@ -87,7 +81,7 @@ public class Myservice extends Service {
             // to redirect the user to the Google App page on Play Store
         } catch (GoogleVoiceTypingDisabledException exc) {
             Log.e("speech", "Google voice typing must be enabled!");
-        }
+        }*/
 
     }
 

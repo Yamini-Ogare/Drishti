@@ -68,21 +68,6 @@
 
     </LinearLayout>
 
-    <LinearLayout
-        android:orientation="vertical"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:id="@+id/linearLayout"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="200dp"
-        >
 
-        <net.gotev.speech.ui.SpeechProgressView
-            android:id="@+id/progress"
-            android:layout_width="120dp"
-            android:layout_height="150dp"
-            android:elevation="13dp"/>
-
-    </LinearLayout>
 
 </RelativeLayout>
