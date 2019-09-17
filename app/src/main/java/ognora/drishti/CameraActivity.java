@@ -11,7 +11,9 @@ import android.graphics.BitmapFactory;
 import android.hardware.Camera;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.os.CountDownTimer;
 import android.os.Environment;
+import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
@@ -43,6 +45,8 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
+import static android.support.v4.os.HandlerCompat.postDelayed;
+
 public class CameraActivity extends AppCompatActivity{
 
     private static final int START_SPEECH = 1000;
@@ -61,8 +65,10 @@ public class CameraActivity extends AppCompatActivity{
      boolean hasCameraFlash;
      Camera.Parameters params ;
      private boolean isSoundOn = true;
-     MediaPlayer mediaPlayer;
-     MyCountDown timer;
+    MediaPlayer mp;
+     Handler handler ;
+
+     int MILISTART = 5000, MILIDOWN = 4500;
 
 
     @Override
@@ -88,6 +94,12 @@ public class CameraActivity extends AppCompatActivity{
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 20 , 0);
 
 
+        // Greetings when app is opened
+        mp = MediaPlayer.create(this, R.raw.welcome);
+        mp.start();
+        result.setVisibility(View.VISIBLE);
+        result.setText("  Welcome!! ");
+        delay();
 
 
     }
@@ -96,6 +108,7 @@ public class CameraActivity extends AppCompatActivity{
     protected void onStart() {
         super.onStart();
         openCamera();
+
     }
 
     @Override
@@ -279,7 +292,8 @@ public class CameraActivity extends AppCompatActivity{
                                     //  say(prediction + " Rupees");
                                       result.setVisibility(View.VISIBLE);
                                       result.setText("Rs. "+prediction);
-                                      timer = new MyCountDown(5000, 4000, result);
+                                       switchSound(Integer.parseInt(prediction));
+
                                     //  Toast.makeText(CameraActivity.this, "Rs. "+prediction, Toast.LENGTH_SHORT ).show();
                                   }
 
@@ -300,6 +314,8 @@ public class CameraActivity extends AppCompatActivity{
             }
         }
     };
+
+
 
     private static File getOutputMediaFile() {
 
@@ -341,9 +357,13 @@ public class CameraActivity extends AppCompatActivity{
     // try again
     public void tryagain()
     {  Log.i("speech", "try again");
-       result.setVisibility(View.VISIBLE);
-       result.setText("  Try Again  ");
-       timer = new MyCountDown(5000, 4000, result);
+
+        mp = MediaPlayer.create(this, R.raw.tryagain);
+        mp.start();
+        result.setVisibility(View.VISIBLE);
+        result.setText("  Try Again :( ");
+     delay();
+
     }
 
     //Text to speech
@@ -382,6 +402,7 @@ public class CameraActivity extends AppCompatActivity{
     // camera feature functions
     // click image
     public  void clickPicture() {
+        clickSound();
         if(camera!=null)
         {
             camera.takePicture(null, null, pictureCallback);
@@ -417,7 +438,7 @@ public class CameraActivity extends AppCompatActivity{
     }
 
     private  void turnOffFlash() {
-
+         buttonSound();
         if (isFlashOn) {
             if (camera == null || params == null) {
                 return;
@@ -437,6 +458,8 @@ public class CameraActivity extends AppCompatActivity{
     }
 
     private void turnOnFlash(){
+
+        buttonSound();
         if (!isFlashOn) {
             if (camera == null || params == null) {
                 return;
@@ -467,6 +490,7 @@ public class CameraActivity extends AppCompatActivity{
     }
 
     private void soundOn() {
+        buttonSound();
         isSoundOn = true;
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 20 , 0);
         speaker.setImageResource(R.drawable.sound);
@@ -474,6 +498,7 @@ public class CameraActivity extends AppCompatActivity{
     }
 
     private void soundOff(){
+        buttonSound();
         isSoundOn = false;
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 0 , 0);
         speaker.setImageResource(R.drawable.mute);
@@ -483,10 +508,36 @@ public class CameraActivity extends AppCompatActivity{
 
 
 
-    // Welcome
-    public void welcome()
+    // button SOund Effect
+    public void buttonSound()
     {
-        String msg = "Welcome";
+        mp = MediaPlayer.create(this, R.raw.button);
+        mp.start();
+      delay();
+    }
+
+    public void clickSound()
+    {
+        mp = MediaPlayer.create(this, R.raw.click);
+        mp.start();
+        delay();
+
+    }
+
+    private void switchSound(int value) {
+
+        switch (value){
+
+            case 10 : mp = MediaPlayer.create(this, R.raw.ten); break;
+            case 50 : mp = MediaPlayer.create(this, R.raw.fifty); break;
+            case 100 : mp = MediaPlayer.create(this, R.raw.oneh); break;
+            case 200 : mp = MediaPlayer.create(this, R.raw.twoh); break;
+            case 500 : mp = MediaPlayer.create(this, R.raw.fiveh); break;
+            case 2000 : mp = MediaPlayer.create(this, R.raw.twot); break;
+            default: mp = MediaPlayer.create(this, R.raw.button); break;
+        }
+        mp.start();
+       delay();
     }
 
 
@@ -505,6 +556,9 @@ public class CameraActivity extends AppCompatActivity{
         return super.dispatchKeyEvent(event);
     }
 
-
+  void delay()
+  {
+      final MyCountDown timer = new MyCountDown(MILISTART, MILIDOWN, result, mp);
+  }
 
 }
