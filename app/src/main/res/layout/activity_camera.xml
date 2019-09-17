@@ -58,16 +58,37 @@
             android:layout_toRightOf="@+id/click"
             android:layout_marginLeft="30dp"
             android:src="@drawable/flip"
-            android:id="@+id/flip"
+            android:background="@color/dark"
+            android:id="@+id/mic"
             android:elevation="10dp"
-            android:clickable="true"/>
-
-
+            android:clickable="true"
+            android:onClick="micButton"/>
 
     </RelativeLayout>
 
     </LinearLayout>
 
-
-
+    <ImageView
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_alignParentRight="true"
+        android:layout_marginTop="20dp"
+        android:layout_marginRight="20dp"
+        android:src="@drawable/sound"
+        android:id="@+id/sound"
+        android:clickable="true"
+        android:onClick="sound"
+        android:elevation="18dp"
+        />
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/result"
+        android:visibility="gone"
+        android:textSize="30sp"
+        android:textColor="@color/dark"
+        android:background="#ffffff"
+        android:elevation="18dp"
+        android:layout_centerInParent="true"
+        />
 </RelativeLayout>

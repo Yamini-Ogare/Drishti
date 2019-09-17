@@ -8,7 +8,7 @@ import retrofit2.converter.gson.GsonConverterFactory;
 
 public class ApiClient {
 
-    static String BASE_URL = "http://192.168.43.5:5000";
+    static String BASE_URL = "http://myflaskapi.herokuapp.com";
 
     private static Retrofit retrofit = null;
 

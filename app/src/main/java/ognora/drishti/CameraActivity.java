@@ -1,7 +1,6 @@
 package ognora.drishti;
 
 import android.Manifest;
-import android.annotation.TargetApi;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -10,14 +9,11 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.hardware.Camera;
-import android.hardware.camera2.CameraAccessException;
-import android.hardware.camera2.CameraManager;
+import android.media.AudioManager;
 import android.media.MediaPlayer;
-import android.os.Build;
 import android.os.Environment;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
-import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -26,31 +22,19 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
-import net.gotev.speech.GoogleVoiceTypingDisabledException;
 import net.gotev.speech.Logger;
 import net.gotev.speech.Speech;
-import net.gotev.speech.SpeechDelegate;
-import net.gotev.speech.SpeechRecognitionNotAvailable;
 import net.gotev.speech.TextToSpeechCallback;
 
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.OutputStream;
-import java.security.Policy;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
@@ -58,23 +42,27 @@ import okhttp3.RequestBody;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
-import retrofit2.Retrofit;
-import retrofit2.converter.gson.GsonConverterFactory;
 
 public class CameraActivity extends AppCompatActivity{
 
     private static final int START_SPEECH = 1000;
      Camera camera;
     FrameLayout cameraPreview;
-    ImageView flash, click, flip;
-    int PERMISSION = 101;
+    ImageView flash, click, speaker;
+    int PERMISSION = 302;
      String TAG = "Error";
+     TextView result;
 
 
     ShowCamera showCamera ;
+    AudioManager audioManager;
 
-     private boolean isFlashOn = false;boolean hasCameraFlash;
+     private boolean isFlashOn = false;
+     boolean hasCameraFlash;
      Camera.Parameters params ;
+     private boolean isSoundOn = true;
+     MediaPlayer mediaPlayer;
+     MyCountDown timer;
 
 
     @Override
@@ -85,8 +73,10 @@ public class CameraActivity extends AppCompatActivity{
         cameraPreview = findViewById(R.id.camera);
         flash = findViewById(R.id.flash);
         click = findViewById(R.id.click);
-        flip = findViewById(R.id.flip);
+        speaker = findViewById(R.id.sound);
+        result = findViewById(R.id.result);
 
+        checkPermission();
 
      //    final MediaPlayer mp = MediaPlayer.create(this, R.raw.soho);
 
@@ -94,9 +84,12 @@ public class CameraActivity extends AppCompatActivity{
                 hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH);
 
         Logger.setLogLevel(Logger.LogLevel.DEBUG);
+        audioManager = (AudioManager) this.getSystemService(Context.AUDIO_SERVICE);
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 20 , 0);
 
 
-        checkPermission();
+
+
     }
 
     @Override
@@ -118,19 +111,33 @@ public class CameraActivity extends AppCompatActivity{
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if(requestCode==START_SPEECH && resultCode==RESULT_OK && data!= null){
-        //   compare(data.getExtras().getString("key"));
+
         }
     }
 
     private void compare(String key ) {
+        Toast.makeText(this,"You said: "+ key, Toast.LENGTH_SHORT).show();
+
         if(key.toLowerCase().contains("click"))
-            clickPicture();
-        else if(key.toLowerCase().contains("flash"))
-            flashtoggle(this);
+          clickPicture();
+        else if(key.toLowerCase().contains("flash on"))
+               turnOnFlash();
+         else
+             if(key.toLowerCase().contains("flash off"))
+                 turnOffFlash();
+         else if(key.toLowerCase().contains("flash"))
+                  flashtoggle(this);
+             else
+                 if(key.toLowerCase().contains("sound"))
+                         soundOn();
+                 else
+                     if(key.toLowerCase().contains("mute"))
+                         soundOff();
 
 
 
     }
+
 
     private void openSpeech() {
 
@@ -155,13 +162,17 @@ public class CameraActivity extends AppCompatActivity{
 
     private void checkPermission() {
 
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA )
-                != PackageManager.PERMISSION_GRANTED  && (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+        if ((ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA )
+                != PackageManager.PERMISSION_GRANTED ) && (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED ) && (ActivityCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED )) {
 
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE,
                     Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO}, PERMISSION);
 
+        }
+        else {
+            return;
         }
     }
 
@@ -173,6 +184,7 @@ public class CameraActivity extends AppCompatActivity{
 
             if(grantResults[0] == PackageManager.PERMISSION_GRANTED && grantResults[1] == PackageManager.PERMISSION_GRANTED
             && grantResults[2]==PackageManager.PERMISSION_GRANTED){
+               openCamera();
                return;
             }
             else
@@ -209,6 +221,19 @@ public class CameraActivity extends AppCompatActivity{
         flashtoggle(this);
     }
 
+    //when speaker is clicked
+    public void sound(View view) {
+
+        soundToggle();
+
+    }
+
+    //when mic button is clicked
+
+    public void micButton(View view) {
+
+        openSpeech();
+    }
 
 
     Camera.PictureCallback pictureCallback = new Camera.PictureCallback() {
@@ -216,14 +241,13 @@ public class CameraActivity extends AppCompatActivity{
         public void onPictureTaken(byte[] bytes, Camera camera) {
             //when picture is taken
 
-           // File pictureFile = getOutputMediaFile();
             File pictureFile = getFileFromBytes(bytes);
 
             if (pictureFile==null)
                 return;
             else
             {
-             /*       //send to ml using retrofit
+                    //send to ml using retrofit
 
                     Api api = ApiClient.getClient().create(Api.class);
 
@@ -250,9 +274,14 @@ public class CameraActivity extends AppCompatActivity{
                                         prediction = obj.get("label").getAsString();
 
                                   if(prediction.equalsIgnoreCase("0"))
-                                      Toast.makeText(CameraActivity.this, "Try again", Toast.LENGTH_LONG).show();
-                                  else
-                                    Toast.makeText(CameraActivity.this, prediction + " note", Toast.LENGTH_LONG).show();
+                                            tryagain();
+                                  else {
+                                    //  say(prediction + " Rupees");
+                                      result.setVisibility(View.VISIBLE);
+                                      result.setText("Rs. "+prediction);
+                                      timer = new MyCountDown(5000, 4000, result);
+                                    //  Toast.makeText(CameraActivity.this, "Rs. "+prediction, Toast.LENGTH_SHORT ).show();
+                                  }
 
                                 }
 
@@ -264,7 +293,7 @@ public class CameraActivity extends AppCompatActivity{
                         public void onFailure(Call<JsonObject> call, Throwable t) {
                             t.printStackTrace();
                         }
-                    });*/
+                    });
 
                     camera.startPreview();
 
@@ -309,42 +338,46 @@ public class CameraActivity extends AppCompatActivity{
     }
 
 
-
-    // voice recognition
-
-
-
-
-
     // try again
     public void tryagain()
     {  Log.i("speech", "try again");
-        //  voiceRecognition();
-        //  startService(new Intent(this, Myservice.class));
-
+       result.setVisibility(View.VISIBLE);
+       result.setText("  Try Again  ");
+       timer = new MyCountDown(5000, 4000, result);
     }
 
     //Text to speech
 
-    public void say (String msg){
-        Speech.getInstance().say("say something", new TextToSpeechCallback() {
-            @Override
-            public void onStart() {
-                Log.i("speech", "speech started");
-            }
+  /*  public void say (final String msg){
 
-            @Override
-            public void onCompleted() {
-                Log.i("speech", "speech completed");
-            }
+        Speech.init(this, getPackageName());
+        if( msg!=null) {
 
-            @Override
-            public void onError() {
-                Log.i("speech", "speech error");
-            }
-        });
+            Speech.getInstance().say(msg, new TextToSpeechCallback() {
+                @Override
+                public void onStart() {
+                    Log.i("speech", "speech started");
+                    result.setText(msg);
+                    result.setVisibility(View.VISIBLE);
+                }
 
-    }
+                @Override
+                public void onCompleted() {
+                    Log.i("speech", "speech completed");
+                    result.setVisibility(View.GONE);
+                }
+
+                @Override
+                public void onError() {
+                    Log.i("speech", "speech error");
+                }
+            });
+        }
+
+        Speech.getInstance().stopTextToSpeech();
+        Speech.getInstance().shutdown();
+
+    }*/
 
     // camera feature functions
     // click image
@@ -353,9 +386,6 @@ public class CameraActivity extends AppCompatActivity{
         {
             camera.takePicture(null, null, pictureCallback);
         }
-       // startService(new Intent(this, Myservice.class));
-
-
     }
 
     // flash
@@ -425,18 +455,42 @@ public class CameraActivity extends AppCompatActivity{
 
     }
 
-    //Voice mute
+    //Voice mute/un-mute
+
+    private void soundToggle() {
+        if(isSoundOn)
+            soundOff();
+        else
+            soundOn();
+
+
+    }
+
+    private void soundOn() {
+        isSoundOn = true;
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 20 , 0);
+        speaker.setImageResource(R.drawable.sound);
+
+    }
+
+    private void soundOff(){
+        isSoundOn = false;
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, 0 , 0);
+        speaker.setImageResource(R.drawable.mute);
+
+    }
+
 
 
 
     // Welcome
-
     public void welcome()
     {
         String msg = "Welcome";
-
     }
 
+
+   // Volume up button to trigger mic
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
 
@@ -444,14 +498,13 @@ public class CameraActivity extends AppCompatActivity{
 
              if(event.getKeyCode()==KeyEvent.KEYCODE_VOLUME_UP){
                  openSpeech();
-               //  clickPicture();
                  return true;
              }
-
          }
 
         return super.dispatchKeyEvent(event);
-
-
     }
+
+
+
 }
